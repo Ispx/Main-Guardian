@@ -3,6 +3,10 @@ name: 'Main Guardian Agent'
 description: 'Analyzes PR diffs against the main branch using Gemini AI and comments on the PR with the analysis.'
 author: 'Ispx'
 
+branding:
+  icon: 'anchor'
+  color: 'black'
+
 # Define as entradas que a action aceita
 inputs:
   gemini-api-key:
