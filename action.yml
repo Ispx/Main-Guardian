@@ -115,10 +115,10 @@ runs:
           # Cria o payload para requisição Gemini
           # Nota: A API pode ter limites no tamanho do diff. Tratar erros ou dividir diffs grandes pode ser necessário.
           json_payload=$(jq -n \
-          --arg baseRef "$BASE_REF" \
-          --arg headRef "$HEAD_REF" \
-          --arg file "$file"
-          --arg originalFile "$original_file_output" \
+          --arg base_ref "$BASE_REF" \
+          --arg head_ref "$HEAD_REF" \
+          --arg file_name "$file" \
+          --arg original_file "$original_file_output" \
           --arg diff "$diff_output" \
           --arg msg1 "$system_msg_1" \
           --arg msg2 "$system_msg_2" \
@@ -137,9 +137,9 @@ runs:
               contents: [
                 {
                   parts: [
-                  {text: "==== Leitura do arquivo $file antes das mudanças (Branch: $baseRef) =====\n\n"},
-                  { text: $originalFile },
-                  {text: "==== Leitura do arquivo $file com as mudanças (Branch: $headRef) =====\n\n",
+                  { text: "==== Leitura do arquivo $file_name antes das mudanças (Branch: $base_ref) =====\n\n" },
+                  { text: $original_file },
+                  { text: "==== Leitura do arquivo $file_name com as mudanças (Branch: $head_ref) =====\n\n" },
                   { text: $diff }
                   ]
                 }
