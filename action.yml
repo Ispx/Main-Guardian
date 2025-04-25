@@ -94,7 +94,7 @@ runs:
           
           # Extrai conteúdo atual do arquivo na branch do PR
           # Usar --no-prefix para caminhos mais limpos no diff
-          diff_output=$(git dif --no-prefix $BASE_REF $HEAD_REF -- "$file")
+          diff_output=$(git diff --no-prefix $BASE_REF $HEAD_REF -- "$file")
           
 
           # Se o diff estiver vazio (ex: apenas mudança de modo), pula a análise para este arquivo
