@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Run Main Guardian Agent
-        uses: Ispx/main-guardian-agent@v1
+        uses: Ispx/Main-Guardian@v1.0.7
         with:
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
