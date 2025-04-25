@@ -137,9 +137,9 @@ runs:
               contents: [
                 {
                   parts: [
-                  { text: "==== Leitura do arquivo $file_name antes das mudanças (Branch: $base_ref) =====\n\n" },
+                  { text: "==== Leitura do arquivo \($file_name) antes das mudanças (Branch: \($base_ref)) =====\n\n" },
                   { text: $original_file },
-                  { text: "==== Leitura do arquivo $file_name com as mudanças (Branch: $head_ref) =====\n\n" },
+                  { text: "==== Leitura do arquivo \($file_name) com as mudanças (Branch: \($head_ref)) =====\n\n" },
                   { text: $diff }
                   ]
                 }
