@@ -65,9 +65,8 @@ runs:
         # Define as mensagens do sistema para a IA (mantidas aqui para simplicidade)
         # TODO: Considerar tornar estas mensagens inputs da action para maior flexibilidade
         system_msg_1="Você é responsável por proteger a branch main das novas alterações que serão implementadas, para isso você precisa realizar uma análise criteriosa das novas alterações que serão implementadas."
-        system_msg_2="Seu objetivo é identificar possíveis bugs, vulnerabilidades, alterações críticas que possam afetar as funcionalidades já existentes na branch $BASE_REF, sugerir melhorias/refatorações nas implementações da branch $HEAD_REF e por fim gerar um score de aprovação entre 0 a 10 para aprovação das novas mudanças, porém caso exista algum bug, quebra de funcionalidade na branch $BASE_REF vulnerabilidade ou outro problema critico o scode deve ser 0."
-        system_msg_3="Para dar mais contexto do impacto das novas alterações você sempre será contextualizado da leitura original do arquivo antes das novas alterações, caso estiver fazio significa que o arquivo não existe na branch $BASE_REF."
-        system_msg_4="Por fim, use icons para demarcar cada tipo de análise, por exemplo, um icone expecifico para anlaise de bugs, outro para vulnerabilidades, etc. Formate a saída em Markdown."
+        system_msg_2="Seu objetivo é identificar possíveis bugs, vulnerabilidades, alterações críticas que possam afetar as funcionalidades já existentes na branch principal $BASE_REF, sugerir melhorias/refatorações nas implementações da branch atual e por fim gerar um score de aprovação entre 0 a 10 para aprovação das novas mudanças mudanças, porém caso exista uma mudança critica ou uma grande vulnerabilidade o scode deve ser 0."
+        system_msg_3="Use icons para demarcar cada tipo de análise, por exemplo, um icone expecifico para anlaise de bugs, outro para vulnerabilidades, etc. Formate a saída em Markdown."
 
         # Pega a lista de arquivos alterados
         echo "Identifying changed files between $BASE_REF and $HEAD_REF..."
@@ -89,13 +88,10 @@ runs:
 
         # Itera sobre cada arquivo alterado para gerar relatório de análise.
         for file in $changed_files; do
-          
           echo "Analyzing file: $file"
-          
           # Extrai conteúdo atual do arquivo na branch do PR
           # Usar --no-prefix para caminhos mais limpos no diff
-          diff_output=$(git dif --no-prefix $BASE_REF $HEAD_REF -- "$file")
-          
+          diff_output=$(git diff --no-prefix $BASE_REF $HEAD_REF -- "$file")
 
           # Se o diff estiver vazio (ex: apenas mudança de modo), pula a análise para este arquivo
           if [ -z "$diff_output" ]; then
@@ -103,44 +99,25 @@ runs:
             continue
           fi
 
-          # Realiza a leitura do arquivo sem as mudanças para dar mais contexto dos impactos das alterações para a IA
-          original_file_output=""
-          if git cat-file -e origin/$BASE_REF:"$file"; then
-            original_file_output=$(git show origin/$BASE_REF:"$file")
-          else
-            echo "File $file does not exist in origin/$BASE_REF. Skipping original content."
-            original_file_output=""
-          fi
-
           # Cria o payload para requisição Gemini
           # Nota: A API pode ter limites no tamanho do diff. Tratar erros ou dividir diffs grandes pode ser necessário.
           json_payload=$(jq -n \
-          --arg baseRef "$BASE_REF" \
-          --arg headRef "$HEAD_REF" \
-          --arg file "$file"
-          --arg originalFile "$original_file_output" \
           --arg diff "$diff_output" \
           --arg msg1 "$system_msg_1" \
           --arg msg2 "$system_msg_2" \
           --arg msg3 "$system_msg_3" \
-          --arg msg4 "$system_msg_4" \
             '{
               system_instruction: {
                 parts: [
                   { text: $msg1 },
                   { text: $msg2 },
-                  { text: $msg3 },
-                  { text: $msg4 }
-
+                  { text: $msg3 }
                 ]
               },
               contents: [
                 {
                   parts: [
-                  {text: "==== Leitura do arquivo $file antes das mudanças (Branch: $baseRef) =====\n\n"},
-                  { text: $originalFile },
-                  {text: "==== Leitura do arquivo $file com as mudanças (Branch: $headRef) =====\n\n",
-                  { text: $diff }
+                    { text: $diff }
                   ]
                 }
               ],
