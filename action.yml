@@ -84,7 +84,7 @@ runs:
         echo "---"
 
         # Variável para armazenar todas os retornos da IA.
-        all_outputs="# Análise do Guardião da Main\n\n"
+        all_outputs="#Analyse Main Guardian Agent\n\n\\n\n"
 
         # Itera sobre cada arquivo alterado para gerar relatório de análise.
         for file in $changed_files; do
