@@ -105,10 +105,10 @@ runs:
 
           # Realiza a leitura do arquivo sem as mudanças para dar mais contexto dos impactos das alterações para a IA
           original_file_output=""
-          if git cat-file -e origin/$BASE_REF:"$file"; then
-            original_file_output=$(git show origin/$BASE_REF:"$file")
+          if git cat-file -e $BASE_REF:"$file"; then
+            original_file_output=$(git show $BASE_REF:"$file")
           else
-            echo "File $file does not exist in origin/$BASE_REF. Skipping original content."
+            echo "File $file does not exist in $BASE_REF. Skipping original content."
             original_file_output=""
           fi
 
