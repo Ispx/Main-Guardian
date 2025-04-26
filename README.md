@@ -31,6 +31,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   guardian-analysis:
     runs-on: ubuntu-latest
