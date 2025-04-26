@@ -49,7 +49,7 @@ jobs:
 | Nome           | Descrição                                                                          | Obrigatório | Padrão                                       |
 |----------------|-------------------------------------------------------------------------------------|-------------|----------------------------------------------|
 | `gemini-api-key` | Sua chave de API do Google Gemini.<br>🔗 [Gerar chave](https://ai.google.dev/gemini-api/docs/api-key?hl=pt-br) | ✅ Sim      | -                                            |
-| `github-token`   | Token do GitHub com permissão de leitura/escrita no repositório.                 | ✅ Sim      | `${{ github.token }}`                       |
+| `github-token`   | Personal Acesso Token do GitHub com permissão de leitura/escrita no repositório.                 | ✅ Sim      | `${{ github.token }}`                       |
 
 
 🛠️ Requisitos
