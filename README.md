@@ -23,9 +23,8 @@ Comenta automaticamente o relatório no próprio PR
 🚀 Como usar
 Adicione a action ao seu workflow YAML dentro de .github/workflows/:
 
-yaml
-Copiar
-Editar
+
+```yaml
 name: Analyse PR with Main Guardian Agent
 
 on:
@@ -38,10 +37,13 @@ jobs:
 
     steps:
       - name: Run Main Guardian Agent
-        uses: Ispx/Main-Guardian@v1.0.7
+        uses: Ispx/main-guardian-agent@v1
         with:
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+
 🔐 Inputs
 
 Nome	Descrição	Obrigatório	Padrão
@@ -60,3 +62,12 @@ Sugerir melhorias e refatorações
 Emitir um score de aprovação (0 a 10) — caso encontre problemas críticos, o score será 0
 
 Gerar relatório em formato Markdown com ícones para cada tipo de análise (💥 bugs, 🔐 vulnerabilidades, 🧼 refatorações etc.)
+
+
+🧪 Dicas para desenvolvimento
+Para testes locais ou execuções manuais, você pode rodar a action usando act (https://github.com/nektos/act)
+
+Recomendado usar em repositórios com testes automatizados para validar a efetividade das sugestões
+
+🧾 Licença
+MIT © Ispx
