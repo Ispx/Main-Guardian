@@ -72,5 +72,6 @@ Para testes locais ou execuções manuais, você pode rodar a action usando act 
 
 Recomendado usar em repositórios com testes automatizados para validar a efetividade das sugestões
 
-🧾 Licença \n
+🧾 Licença
+
 MIT © Ispx
