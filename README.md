@@ -47,8 +47,9 @@ jobs:
 🔐 Inputs
 
 Nome	Descrição	Obrigatório	Padrão
-gemini-api-key	Sua chave de API do Google Gemini.	✅ Sim	-
-github-token	Token do GitHub com permissão de leitura/escrita no repositório.	✅ Sim	${{ github.token }}
+gemini-api-key:	Sua chave de API do Google Gemini.	✅ Sim	- (https://ai.google.dev/gemini-api/docs/api-key?hl=pt-br)
+github-token:	Token do GitHub com permissão de leitura/escrita no repositório.	✅ Sim	${{ github.token }}
+
 🛠️ Requisitos
 A action espera que as ferramentas jq e curl estejam instaladas no runner (no GitHub-hosted já vêm por padrão).
 
