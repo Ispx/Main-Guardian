@@ -152,11 +152,14 @@ runs:
             }'
           )
 
+          echo "$json_payload" > payload.json
+
+
           # Envia o payload para a IA Gemini
           # Adiciona -sS para silenciar progresso mas mostrar erros, e --fail para falhar em erros HTTP
           response=$(curl -sS --fail --location "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${{ inputs.gemini-api-key }}" \
             --header 'Content-Type: application/json' \
-            --data-raw "$json_payload")
+            --data-binary @payload.json)
 
           # Verifica se o curl falhou
           if [ $? -ne 0 ]; then
