@@ -172,7 +172,7 @@ runs:
 
           # Armazena a mensagem na variável
           all_outputs+="### Arquivo: \`$file\`\n$output_text\n\n---\n\n"
-          sleep 20
+          sleep 10
         done
 
         echo "Analysis complete. Saving to analysis.txt"
