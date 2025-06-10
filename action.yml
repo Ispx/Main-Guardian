@@ -174,18 +174,62 @@ runs:
           output_text=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text // "Erro: Resposta da IA não encontrada ou em formato inesperado."')
 
           # Armazena a mensagem na variável
-          all_outputs+="### Arquivo: \`$file\`\n$output_text\n\n---\n\n"
+          # all_outputs+="### Arquivo: \`$file\`\n$output_text\n\n---\n\n"
+
+
+          # Envia o comentário para o PR
+ 
+          echo "Posting comment to PR #$PR_NUMBER"
+          # Verifica se o número do PR foi obtido
+          if [ -z "$PR_NUMBER" ]; then
+            echo "Error: Could not get Pull Request number."
+            exit 1
+          fi
+
+          # Lê o conteúdo da análise e escapa para JSON
+          # Usar jq -Rs . é uma forma robusta de converter texto em string JSON
+          body_content="$output_text"
+          if [ -z "$body_content" ]; then
+            echo "Analysis file is empty. Skipping comment."
+            exit 0
+          fi
+          json_body=$(echo "$body_content" | jq -Rs .)
+
+          # Monta o payload JSON final para a API do GitHub
+          post_data="{\"body\": $json_body}"
+
+          # URL da API para comentar no PR (issue)
+          comments_url="https://api.github.com/repos/$REPO_FULL_NAME/issues/$PR_NUMBER/comments"
+
+          # Faz a requisição POST para a API do GitHub
+          curl_response=$(curl -sS --fail -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            -d "$post_data" \
+            "$comments_url" -o /dev/null) # -o /dev/null descarta o corpo da resposta
+
+          http_code=$(echo "$curl_response")
+
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "Successfully posted comment to PR #$PR_NUMBER (HTTP $http_code)."
+          else
+            echo "Error posting comment to PR #$PR_NUMBER. HTTP Status Code: $http_code"
+            # Considerar logar mais detalhes se a API retornar um corpo de erro
+            exit 1
+          fi
           sleep 10
         done
 
-        echo "Analysis complete. Saving to analysis.txt"
+        # echo "Analysis complete. Saving to analysis.txt"
         # Salva a análise em um arquivo que será usado no próximo passo
         # Usar >> $GITHUB_STEP_SUMMARY para adicionar ao resumo do Job (opcional)
-        echo -e "$all_outputs" > analysis.txt
-        echo "Analysis saved."
+        # echo -e "$all_outputs" > analysis.txt
+        # echo "Analysis saved."
 
     # 3. Comenta no Pull Request com o resultado da análise
     - name: Comment on Pull Request
+      if: false
       shell: bash
       # Garante que GITHUB_EVENT_PATH está disponível e é um PR
       # A action só roda em 'pull_request', então isso deve ser seguro.
