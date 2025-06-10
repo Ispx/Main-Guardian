@@ -33,6 +33,10 @@ runs:
     - name: Analyze Diff and Generate Report
       id: analyze # Dá um ID ao passo para referenciar outputs se necessário no futuro
       shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }} # Usa o token passado como input
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO_FULL_NAME: ${{ github.repository }}
       run: |
         # Verifica se jq está instalado (dependência)
         if ! command -v jq &> /dev/null
