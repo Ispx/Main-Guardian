@@ -52,19 +52,18 @@ runs:
         fi
 
         echo "Starting analysis..."
-        BASE_BRANCH_NAME="main" # Nome da branch base
         # Tenta determinar a branch base remota (geralmente origin/main)
         BASE_BRANCH=$(git rev-parse --abbrev-ref origin/HEAD | sed 's/origin\///')
         if [ -z "$BASE_BRANCH" ]; then
           echo "Could not determine the default remote branch. Assuming 'main'."
-          BASE_BRANCH="main"
+          exit 1
         fi
         echo "Base branch identified as: origin/$BASE_BRANCH"
 
         # Garante que a branch base remota está atualizada localmente
         git fetch origin $BASE_BRANCH --no-tags # Evita buscar tags desnecessárias
         BASE_REF="origin/$BASE_BRANCH"
-        HEAD_REF="HEAD" # O commit atual do PR
+        HEAD_REF=${{ github.head_ref || github.ref_name }} # O commit atual do PR
 
         # Define as mensagens do sistema para a IA (mantidas aqui para simplicidade)
         # TODO: Considerar tornar estas mensagens inputs da action para maior flexibilidade
@@ -178,7 +177,7 @@ runs:
           output_text=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text // "Erro: Resposta da IA não encontrada ou em formato inesperado."')
 
           # Armazena a mensagem na variável
-          # all_outputs+="### Arquivo: \`$file\`\n$output_text\n\n---\n\n"
+          body_content="### Arquivo: \`$file\`\n$output_text\n\n---\n\n"
 
 
           # Envia o comentário para o PR
@@ -192,7 +191,6 @@ runs:
 
           # Lê o conteúdo da análise e escapa para JSON
           # Usar jq -Rs . é uma forma robusta de converter texto em string JSON
-          body_content="$output_text"
           if [ -z "$body_content" ]; then
             echo "Analysis file is empty. Skipping comment."
             exit 0
@@ -224,66 +222,3 @@ runs:
           fi
           sleep 10
         done
-
-        # echo "Analysis complete. Saving to analysis.txt"
-        # Salva a análise em um arquivo que será usado no próximo passo
-        # Usar >> $GITHUB_STEP_SUMMARY para adicionar ao resumo do Job (opcional)
-        # echo -e "$all_outputs" > analysis.txt
-        # echo "Analysis saved."
-
-    # 3. Comenta no Pull Request com o resultado da análise
-    - name: Comment on Pull Request
-      if: false
-      shell: bash
-      # Garante que GITHUB_EVENT_PATH está disponível e é um PR
-      # A action só roda em 'pull_request', então isso deve ser seguro.
-      env:
-        GH_TOKEN: ${{ inputs.github-token }} # Usa o token passado como input
-        PR_NUMBER: ${{ github.event.pull_request.number }}
-        REPO_FULL_NAME: ${{ github.repository }}
-      run: |
-        echo "Posting comment to PR #$PR_NUMBER"
-        # Verifica se o número do PR foi obtido
-        if [ -z "$PR_NUMBER" ]; then
-          echo "Error: Could not get Pull Request number."
-          exit 1
-        fi
-
-        # Lê o conteúdo da análise e escapa para JSON
-        # Usar jq -Rs . é uma forma robusta de converter texto em string JSON
-        body_content=$(cat analysis.txt)
-        if [ -z "$body_content" ]; then
-          echo "Analysis file is empty. Skipping comment."
-          exit 0
-        fi
-        json_body=$(echo "$body_content" | jq -Rs .)
-
-        # Monta o payload JSON final para a API do GitHub
-        post_data="{\"body\": $json_body}"
-
-        # URL da API para comentar no PR (issue)
-        comments_url="https://api.github.com/repos/$REPO_FULL_NAME/issues/$PR_NUMBER/comments"
-
-        # Faz a requisição POST para a API do GitHub
-        curl_response=$(curl -sS --fail -w "%{http_code}" -X POST \
-          -H "Authorization: Bearer $GH_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          -H "Content-Type: application/json" \
-          -d "$post_data" \
-          "$comments_url" -o /dev/null) # -o /dev/null descarta o corpo da resposta
-
-        http_code=$(echo "$curl_response")
-
-        if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-          echo "Successfully posted comment to PR #$PR_NUMBER (HTTP $http_code)."
-        else
-          echo "Error posting comment to PR #$PR_NUMBER. HTTP Status Code: $http_code"
-          # Considerar logar mais detalhes se a API retornar um corpo de erro
-          exit 1
-        fi
-
-# (Opcional) Definir outputs se a action precisar retornar valores
-# outputs:
-#   analysis-result:
-#     description: 'The full analysis text generated.'
-#     value: ${{ steps.analyze.outputs.analysis_file_path }} # Exemplo, precisaria ajustar script para setar output
