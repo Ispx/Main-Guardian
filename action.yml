@@ -65,10 +65,10 @@ runs:
 
 
         BASE_REF="origin/$BASE_BRANCH"
-        HEAD_REF=${{ github.head_ref || github.ref_name }} # O commit atual do PR
+        HEAD_REF="origin/${{ github.head_ref || github.ref_name }}" # O commit atual do PR
 
         # Garante que a branch $HEAD_REF remota está atualizada localmente
-        git fetch origin $HEAD_REF
+        git fetch origin ${{ github.head_ref }}
 
 
         # Define as mensagens do sistema para a IA (mantidas aqui para simplicidade)
