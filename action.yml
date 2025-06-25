@@ -62,8 +62,14 @@ runs:
 
         # Garante que a branch base remota está atualizada localmente
         git fetch origin $BASE_BRANCH --no-tags # Evita buscar tags desnecessárias
+
+
         BASE_REF="origin/$BASE_BRANCH"
         HEAD_REF=${{ github.head_ref || github.ref_name }} # O commit atual do PR
+
+        # Garante que a branch $HEAD_REF remota está atualizada localmente
+        git fetch origin $HEAD_REF
+
 
         # Define as mensagens do sistema para a IA (mantidas aqui para simplicidade)
         # TODO: Considerar tornar estas mensagens inputs da action para maior flexibilidade
@@ -71,6 +77,7 @@ runs:
         system_msg_2="Seu objetivo é identificar possíveis bugs, vulnerabilidades, alterações críticas que possam afetar as funcionalidades já existentes na branch $BASE_REF, sugerir melhorias/refatorações nas implementações da branch $HEAD_REF e por fim gerar um score de aprovação entre 0 a 10 para aprovação das novas mudanças, porém caso exista algum bug, quebra de funcionalidade na branch $BASE_REF vulnerabilidade ou outro problema critico o scode deve ser 0."
         system_msg_3="Para dar mais contexto do impacto das novas alterações você sempre será contextualizado da leitura original do arquivo antes das novas alterações, caso estiver fazio significa que o arquivo não existe na branch $BASE_REF."
         system_msg_4="Por fim, use icons para demarcar cada tipo de análise, por exemplo, um icone expecifico para anlaise de bugs, outro para vulnerabilidades, etc. Formate a saída em Markdown."
+
 
         # Pega a lista de arquivos alterados
         echo "Identifying changed files between $BASE_REF and $HEAD_REF..."
