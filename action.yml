@@ -53,7 +53,7 @@ runs:
 
         echo "Starting analysis..."
         # Tenta determinar a branch base remota (geralmente origin/main)
-        BASE_BRANCH=$(git rev-parse --abbrev-ref origin/HEAD | sed 's/origin\///')
+        BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
         if [ -z "$BASE_BRANCH" ]; then
           echo "Could not determine the default remote branch. Assuming 'main'."
           exit 1
