@@ -37,6 +37,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }} # Usa o token passado como input
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPO_FULL_NAME: ${{ github.repository }}
+        URL_GEMINI: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
       run: |
         # Verifica se jq está instalado (dependência)
         if ! command -v jq &> /dev/null
@@ -167,7 +168,7 @@ runs:
 
           # Envia o payload para a IA Gemini
           # Adiciona -sS para silenciar progresso mas mostrar erros, e --fail para falhar em erros HTTP
-          response=$(curl -sS --fail --location "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${{ inputs.gemini-api-key }}" \
+          response=$(curl -sS --fail --location "$URL_GEMINI?key=${{ inputs.gemini-api-key }}" \
             --header 'Content-Type: application/json' \
             --data-binary @payload.json)
 
