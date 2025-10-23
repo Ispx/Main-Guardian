@@ -168,7 +168,7 @@ runs:
 
           # Envia o payload para a IA Gemini
           # Adiciona -sS para silenciar progresso mas mostrar erros, e --fail para falhar em erros HTTP
-          response=$(curl -sS --fail --location "$URL_GEMINI?key=${{ inputs.gemini-api-key }}" \
+          response=$(curl --retry 1 --retry-delay 30 --retry-connrefused -sS --fail --location "$URL_GEMINI?key=${{ inputs.gemini-api-key }}" \
             --header 'Content-Type: application/json' \
             --data-binary @payload.json)
 
