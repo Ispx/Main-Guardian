@@ -16,6 +16,10 @@ inputs:
     description: 'GitHub token for posting comments and checking out code. Defaults to github.token.'
     required: true
     default: ${{ github.token }} # Usa o token padrão do workflow
+  custom-instructions-file:
+    description: 'Path to a markdown file containing custom instructions for the security analysis.'
+    required: false
+    default: ''
 
 # Define como a action será executada (usando passos compostos)
 runs:
@@ -72,12 +76,18 @@ runs:
         git fetch origin ${{ github.head_ref }}
 
 
-        # Define as mensagens do sistema para a IA (mantidas aqui para simplicidade)
-        # TODO: Considerar tornar estas mensagens inputs da action para maior flexibilidade
-        system_msg_1="Você é responsável por proteger a branch main das novas alterações que serão implementadas, para isso você precisa realizar uma análise criteriosa das novas alterações que serão implementadas."
-        system_msg_2="Seu objetivo é identificar possíveis bugs, vulnerabilidades, alterações críticas que possam afetar as funcionalidades já existentes na branch $BASE_REF, sugerir melhorias/refatorações nas implementações da branch $HEAD_REF e por fim gerar um score de aprovação entre 0 a 10 para aprovação das novas mudanças, porém caso exista algum bug, quebra de funcionalidade na branch $BASE_REF vulnerabilidade ou outro problema critico o scode deve ser 0."
-        system_msg_3="Para dar mais contexto do impacto das novas alterações você sempre será contextualizado da leitura original do arquivo antes das novas alterações, caso estiver fazio significa que o arquivo não existe na branch $BASE_REF."
-        system_msg_4="Por fim, use icons para demarcar cada tipo de análise, por exemplo, um icone expecifico para anlaise de bugs, outro para vulnerabilidades, etc. Formate a saída em Markdown."
+        # Define as mensagens do sistema para a IA (focadas em segurança)
+        system_msg_1="Você é um agente de segurança focado em analisar pull requests e proteger o repositório contra a introdução de vulnerabilidades."
+        system_msg_2="Seu objetivo é analisar o diff e identificar especificamente as seguintes vulnerabilidades: 1. Presença de prints ou debugprints. 2. Registro de dados sensíveis em arquivos do repositório. 3. Registro de dados sensíveis no código fonte. 4. Registro de dados sensíveis em mensagens de logs.5. Configuração inapropriada"
+        system_msg_3="Analise APENAS as mudanças propostas. Caso encontre vulnerabilidades, explique claramente o problema e adicione OBRIGATORIAMENTE a exata tag [VULNERABILITY_DETECTED] na sua resposta. Se não encontrar problemas de segurança em relação aos critérios mencionados, informe que o arquivo parece seguro."
+        system_msg_4="Use ícones para demarcar os tipos de vulnerabilidades identificadas (ex: ⚠️, 🚨). Formate a saída em Markdown."
+        
+        custom_instructions=""
+        CUSTOM_INSTRUCTIONS_FILE="${{ inputs.custom-instructions-file }}"
+        if [ -n "$CUSTOM_INSTRUCTIONS_FILE" ] && [ -f "$CUSTOM_INSTRUCTIONS_FILE" ]; then
+          custom_instructions=$(cat "$CUSTOM_INSTRUCTIONS_FILE")
+          echo "Found custom instructions in $CUSTOM_INSTRUCTIONS_FILE"
+        fi
 
 
         # Pega a lista de arquivos alterados
@@ -98,6 +108,8 @@ runs:
         # Variável para armazenar todas os retornos da IA.
         all_outputs="#Analyse Main Guardian Agent\n\n\\n\n"
 
+        VULNERABILITY_FOUND=false
+
         # Itera sobre cada arquivo alterado para gerar relatório de análise.
         for file in $changed_files; do
           
@@ -114,49 +126,36 @@ runs:
             continue
           fi
 
-          # Realiza a leitura do arquivo sem as mudanças para dar mais contexto dos impactos das alterações para a IA
-          original_file_output=""
-          if git cat-file -e $BASE_REF:"$file"; then
-            original_file_output=$(git show $BASE_REF:"$file")
-          else
-            echo "File $file does not exist in $BASE_REF. Skipping original content."
-            original_file_output=""
-          fi
-
           # Cria o payload para requisição Gemini
           # Nota: A API pode ter limites no tamanho do diff. Tratar erros ou dividir diffs grandes pode ser necessário.
           json_payload=$(jq -n \
-          --arg base_ref "$BASE_REF" \
-          --arg head_ref "$HEAD_REF" \
           --arg file_name "$file" \
-          --arg original_file "$original_file_output" \
           --arg diff "$diff_output" \
           --arg msg1 "$system_msg_1" \
           --arg msg2 "$system_msg_2" \
           --arg msg3 "$system_msg_3" \
           --arg msg4 "$system_msg_4" \
+          --arg custom_instructions "$custom_instructions" \
             '{
               system_instruction: {
                 parts: [
                   { text: $msg1 },
                   { text: $msg2 },
                   { text: $msg3 },
-                  { text: $msg4 }
-
+                  { text: $msg4 },
+                  (if ($custom_instructions != "") then { text: ("Instruções customizadas do usuário:\n" + $custom_instructions) } else empty end)
                 ]
               },
               contents: [
                 {
                   parts: [
-                  { text: "==== Leitura do arquivo \($file_name) antes das mudanças (Branch: \($base_ref)) =====\n\n" },
-                  { text: $original_file },
-                  { text: "==== Leitura do arquivo \($file_name) com as mudanças (Branch: \($head_ref)) =====\n\n" },
+                  { text: "==== Alterações no arquivo \($file_name) =====\n\n" },
                   { text: $diff }
                   ]
                 }
               ],
               generationConfig: {
-                temperature: 0.5,
+                temperature: 0.2,
                 topP: 0.8,
                 topK: 10
               }
@@ -183,6 +182,11 @@ runs:
           # Extrai as mensagens de retorno (assume estrutura de sucesso)
           # Adiciona verificação se o caminho existe no JSON antes de extrair
           output_text=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text // "Erro: Resposta da IA não encontrada ou em formato inesperado."')
+
+          if [[ "$output_text" == *"[VULNERABILITY_DETECTED]"* ]]; then
+            echo "Vulnerability marker detected for $file"
+            VULNERABILITY_FOUND=true
+          fi
 
           # Armazena a mensagem na variável
           body_content="### Arquivo: \`$file\`\n$output_text\n\n---\n\n"
@@ -230,3 +234,10 @@ runs:
           fi
           sleep 10
         done
+
+        if [ "$VULNERABILITY_FOUND" = true ]; then
+          echo "Vulnerabilidades detectadas durante a analise. Falhando a esteira."
+          exit 1
+        else
+          echo "Nenhuma vulnerabilidade detectada. Analise finalizada com sucesso."
+        fi
