@@ -45,6 +45,8 @@ jobs:
         with:
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          single-execution: 'false' //Use isto quiser realizar uma analise especifica do repositório, sem passar pelas alterações do pr.
+          custom-instructions-file: './main-guardian-instructions.md'
 ```
 
 

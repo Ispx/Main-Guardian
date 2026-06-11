@@ -20,6 +20,10 @@ inputs:
     description: 'Path to a markdown file containing custom instructions for the security analysis.'
     required: false
     default: ''
+  single-execution:
+    description: 'Define se a action irá responder apenas uma vez e finalizar. Requer custom-instructions-file.'
+    required: false
+    default: 'false'
 
 # Define como a action será executada (usando passos compostos)
 runs:
@@ -42,6 +46,7 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPO_FULL_NAME: ${{ github.repository }}
         URL_GEMINI: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent
+        SINGLE_EXECUTION: ${{ inputs.single-execution }}
       run: |
         # Verifica se jq está instalado (dependência)
         if ! command -v jq &> /dev/null
@@ -254,9 +259,103 @@ runs:
         CUSTOM_INSTRUCTIONS_FILE="${{ inputs.custom-instructions-file }}"
         if [ -n "$CUSTOM_INSTRUCTIONS_FILE" ] && [ -f "$CUSTOM_INSTRUCTIONS_FILE" ]; then
           custom_instructions=$(cat "$CUSTOM_INSTRUCTIONS_FILE")
+          system_msg_1=""
+          system_msg_2=""
+          system_msg_3=""
+          system_msg_4=""
           echo "Found custom instructions in $CUSTOM_INSTRUCTIONS_FILE"
         fi
 
+        if [ "$SINGLE_EXECUTION" = "true" ]; then
+          if [ -z "$custom_instructions" ]; then
+            echo "Error: custom-instructions-file is required and must not be empty when single-execution is true."
+            exit 1
+          fi
+
+          echo "Running in single execution mode."
+          VULNERABILITY_FOUND=false
+
+          json_payload=$(jq -n \
+          --arg custom_instructions "$custom_instructions" \
+            '{
+              system_instruction: {
+                parts: [
+                  (if ($custom_instructions != "") then { text: ("Instruções customizadas do usuário:\n" + $custom_instructions) } else empty end)
+                ]
+              },
+              contents: [
+                {
+                  parts: [
+                  { text: "==== Execute a instrução ====\n\n" }
+                  ]
+                }
+              ],
+              generationConfig: {
+                temperature: 0.2,
+                topP: 0.8,
+                topK: 10
+              }
+            }'
+          )
+
+          echo "$json_payload" > payload.json
+
+          set +e
+          response=$(curl --retry 3 --retry-delay 15 --retry-connrefused -sS --fail --location "$URL_GEMINI?key=${{ inputs.gemini-api-key }}" \
+            --header 'Content-Type: application/json' \
+            --data-binary @payload.json)
+          curl_exit_status=$?
+          set -e
+
+          if [ $curl_exit_status -ne 0 ]; then
+            echo "Error calling Gemini API in single execution mode. Skipping."
+            echo "Response was: $response"
+            exit 1
+          fi
+
+          output_text=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text // "Erro: Resposta da IA não encontrada ou em formato inesperado."')
+
+          if [[ "$output_text" == *"[VULNERABILITY_DETECTED]"* ]]; then
+            echo "Vulnerability marker detected in single execution."
+            VULNERABILITY_FOUND=true
+          fi
+
+          body_content="### Análise de Execução Única\n$output_text\n\n---\n\n"
+
+          echo "Posting comment to PR #$PR_NUMBER"
+          if [ -z "$PR_NUMBER" ]; then
+            echo "Error: Could not get Pull Request number."
+            exit 1
+          fi
+
+          json_body=$(echo "$body_content" | jq -Rs .)
+          post_data="{\"body\": $json_body}"
+          comments_url="https://api.github.com/repos/$REPO_FULL_NAME/issues/$PR_NUMBER/comments"
+
+          curl_response=$(curl -sS -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            -d "$post_data" \
+            "$comments_url" -o /dev/null)
+
+          http_code=$(echo "$curl_response" | tail -n 1)
+
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "Successfully posted comment to PR #$PR_NUMBER (HTTP $http_code)."
+          else
+            echo "Error posting comment to PR #$PR_NUMBER. HTTP Status Code: $http_code"
+            exit 1
+          fi
+
+          if [ "$VULNERABILITY_FOUND" = true ]; then
+            echo "Vulnerabilidades detectadas. Falhando a esteira."
+            exit 1
+          else
+            echo "Nenhuma vulnerabilidade detectada. Analise finalizada com sucesso."
+            exit 0
+          fi
+        fi
 
         # Pega a lista de arquivos alterados
         echo "Identifying changed files between $BASE_REF and $HEAD_REF..."
@@ -307,11 +406,11 @@ runs:
             '{
               system_instruction: {
                 parts: [
-                  { text: $msg1 },
-                  { text: $msg2 },
-                  { text: $msg3 },
-                  { text: $msg4 },
-                  (if ($custom_instructions != "") then { text: ("Instruções customizadas do usuário:\n" + $custom_instructions) } else empty end)
+                  (if ($msg1 != "") then { text: $msg1 } else empty end),
+                  (if ($msg2 != "") then { text: $msg2 } else empty end),
+                  (if ($msg3 != "") then { text: $msg3 } else empty end),
+                  (if ($msg4 != "") then { text: $msg4 } else empty end),
+                  (if ($custom_instructions != "") then { text: $custom_instructions } else empty end)
                 ]
               },
               contents: [
@@ -334,13 +433,17 @@ runs:
 
 
           # Envia o payload para a IA Gemini
-          # Adiciona -sS para silenciar progresso mas mostrar erros, e --fail para falhar em erros HTTP
-          response=$(curl --retry 1 --retry-delay 30 --retry-connrefused -sS --fail --location "$URL_GEMINI?key=${{ inputs.gemini-api-key }}" \
+          # Desativa temporariamente o "set -e" (padrão no GitHub Actions) para que possamos
+          # tratar falhas do curl sem abortar o script imediatamente. Aumentamos os retries.
+          set +e
+          response=$(curl --retry 3 --retry-delay 15 --retry-connrefused -sS --fail --location "$URL_GEMINI?key=${{ inputs.gemini-api-key }}" \
             --header 'Content-Type: application/json' \
             --data-binary @payload.json)
+          curl_exit_status=$?
+          set -e
 
           # Verifica se o curl falhou
-          if [ $? -ne 0 ]; then
+          if [ $curl_exit_status -ne 0 ]; then
             echo "Error calling Gemini API for file $file. Skipping analysis for this file."
             echo "Response was: $response" # Loga a resposta (pode conter detalhes do erro)
             all_outputs+="### Arquivo: \`$file\`\n⚠️ **Erro ao analisar este arquivo.**\n\n"
@@ -384,7 +487,9 @@ runs:
           comments_url="https://api.github.com/repos/$REPO_FULL_NAME/issues/$PR_NUMBER/comments"
 
           # Faz a requisição POST para a API do GitHub
-          curl_response=$(curl -sS --fail -w "%{http_code}" -X POST \
+          # Removido o '--fail' para não estourar erro imediato (set -e),
+          # pois o http_code é tratado manualmente abaixo.
+          curl_response=$(curl -sS -w "%{http_code}" -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Content-Type: application/json" \
