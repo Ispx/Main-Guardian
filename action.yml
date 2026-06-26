@@ -454,10 +454,11 @@ runs:
           # Adiciona verificação se o caminho existe no JSON antes de extrair
           output_text=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text // "Erro: Resposta da IA não encontrada ou em formato inesperado."')
 
-          if [[ "$output_text" == *"[VULNERABILITY_DETECTED]"* ]]; then
-            echo "Vulnerability marker detected for $file"
-            VULNERABILITY_FOUND=true
+          if [[ "$output_text" != *"[VULNERABILITY_DETECTED]"* ]]; then
+            continue # Pula para o próximo arquivo
           fi
+          echo "Vulnerability marker detected for $file"
+          VULNERABILITY_FOUND=true
 
           # Armazena a mensagem na variável
           body_content="### Arquivo: \`$file\`\n$output_text\n\n---\n\n"
